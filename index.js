@@ -109,7 +109,7 @@ function viewDatabase() {
 // View all employees
 function viewAllEmployees() {
   db.query(
-    "SELECT employees.id AS 'EMPLOYEE ID', employees.first_name AS 'FIRST NAME', employees.last_name AS 'LAST NAME', roles.title AS 'ROLE', departments.name AS 'DEPARTMENT',CONCAT(managers.first_name, ' ', managers.last_name) AS 'MANAGER NAME',roles.salary AS 'SALARY' FROM employees JOIN roles ON employees.role_id = roles.id JOIN departments ON roles.dept_id = departments.id LEFT JOIN employees AS managers ON employees.manager_id = managers.id;",
+    "SELECT employees.id AS 'EMPLOYEE ID', employees.first_name AS 'FIRST NAME', employees.last_name AS 'LAST NAME', roles.title AS 'ROLE', departments.name AS 'DEPARTMENT',CONCAT(managers.first_name, ' ', managers.last_name) AS 'MANAGER NAME',roles.salary AS 'SALARY' FROM employees LEFT JOIN roles ON employees.role_id = roles.id LEFT JOIN departments ON roles.dept_id = departments.id LEFT JOIN employees AS managers ON employees.manager_id = managers.id;",
     function (err, res) {
       if (err) throw err;
       console.table(res);
@@ -182,17 +182,14 @@ function addEmployee() {
         case "Software Engineer":
           roleId = 4;
           break;
-        case "Account Manager":
+        case "Accountant":
           roleId = 5;
           break;
-        case "Accountant":
+        case "Legal Team Lead":
           roleId = 6;
           break;
-        case "Legal Team Lead":
-          roleId = 7;
-          break;
         case "Lawyer":
-          roleId = 8;
+          roleId = 7;
           break;
         default:
           roleId = null;
@@ -278,7 +275,7 @@ function addRole() {
   db.query("SELECT name FROM departments", (err, res) => {
     if (err) throw err;
 
-    departments = res.map(department => department.name);
+    departments = res.map((department) => department.name);
     departments.push("Add a new department");
 
     // Prompt for role information
@@ -318,7 +315,27 @@ function addRole() {
                 (err) => {
                   if (err) throw err;
 
-                  console.log("New role added successfully.");
+                  console.log("New department added successfully.");
+
+                  // Retrieve newly added department's id
+                  db.query(
+                    "SELECT id FROM departments WHERE name = ?",
+                    [departmentAnswer.newDepartment],
+                    (err, res) => {
+                      if (err) throw err;
+
+                      // Insert new role into database with newly added department's id
+                      db.query(
+                        "INSERT INTO roles (title, salary, dept_id) VALUES (?, ?, ?)",
+                        [answer.title, answer.salary, res[0].id],
+                        (err) => {
+                          if (err) throw err;
+
+                          console.log("New role added successfully.");
+                        }
+                      );
+                    }
+                  );
                 }
               );
             });
@@ -339,34 +356,54 @@ function addRole() {
   });
 }
 
-
-
 // Delete a role
 function deleteRole() {
+  db.query("SELECT id, title FROM roles", (err, roles) => {
+    if (err) throw err;
 
-  inquirer
-    .prompt([
-      {
-        name: "roleDelete",
-        type: "input",
-        message: "What is the ID number of the role you would like to delete?",
-      },
-    ])
-    .then(function (answer) {
-      db.query(
-        "DELETE FROM roles WHERE ?",
+    if (roles.length === 0) {
+      console.log("There are no roles to delete.");
+      start();
+      return;
+    }
+
+    inquirer
+      .prompt([
         {
-          id: answer.roleDelete,
+          name: "roleDelete",
+          type: "list",
+          message: "Which role would you like to delete?",
+          choices: roles.map((role) => role.title),
         },
-        function (err) {
-          if (err) throw err;
-          console.log("-----------------");
-          console.log("Role deleted!");
-          console.log("-----------------");
-          start();
-        }
-      );
-    });
+      ])
+      .then(function (answer) {
+        const roleToDelete = roles.find(
+          (role) => role.title === answer.roleDelete
+        );
+
+        db.query(
+          "UPDATE employees SET role_id = NULL WHERE role_id = ?",
+          [roleToDelete.id],
+          (err) => {
+            if (err) throw err;
+
+            db.query(
+              "DELETE FROM roles WHERE ?",
+              {
+                id: roleToDelete.id,
+              },
+              function (err) {
+                if (err) throw err;
+                console.log("-----------------");
+                console.log("Role deleted!");
+                console.log("-----------------");
+                start();
+              }
+            );
+          }
+        );
+      });
+  });
 }
 
 // Manage departments
@@ -376,7 +413,11 @@ function manageDepartments() {
       name: "action",
       type: "list",
       message: "What would you like to do?",
-      choices: ["Add a department", "Delete a department", "Return to main menu"],
+      choices: [
+        "Add a department",
+        "Delete a department",
+        "Return to main menu",
+      ],
     })
     .then(function (answer) {
       switch (answer.action) {
@@ -420,4 +461,56 @@ function addDepartment() {
         }
       );
     });
+}
+
+// Delete a department
+function deleteDepartment() {
+  db.query("SELECT id, name FROM departments", (err, departments) => {
+    if (err) throw err;
+
+    if (departments.length === 0) {
+      console.log("------------------------------------")
+      console.log("There are no departments to delete.");
+      console.log("------------------------------------")
+      start();
+      return;
+    }
+
+    inquirer
+      .prompt([
+        {
+          name: "deptDelete",
+          type: "list",
+          message: "Which department do you want to delete?",
+          choices: departments.map((department) => department.name),
+        },
+      ])
+      .then(function (answer) {
+        const departmentToDelete = departments.find(
+          (department) => department.name === answer.deptDelete
+        );
+
+        db.query(
+          "UPDATE roles SET dept_id = NULL WHERE dept_id = ?",
+          [departmentToDelete.id],
+          (err) => {
+            if (err) throw err;
+
+            db.query(
+              "DELETE FROM departments WHERE ?",
+              {
+                id: departmentToDelete.id,
+              },
+              (err) => {
+                if (err) throw err;
+                console.log("-----------------");
+                console.log("Department deleted!");
+                console.log("-----------------");
+                start();
+              }
+            );
+          }
+        );
+      });
+  });
 }
