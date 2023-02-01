@@ -2,6 +2,7 @@ const express = require("express");
 // Import and require mysql2
 const mysql = require("mysql");
 const inquirer = require("inquirer");
+// const cTable = require("console.table");
 
 const app = express();
 
@@ -39,6 +40,7 @@ function start() {
         "View Database",
         "Add an employee",
         "Delete an employee",
+        "Manage Employees",
         "Manage Roles",
         "Manage Departments",
         "Exit",
@@ -58,6 +60,10 @@ function start() {
           deleteEmployee();
           break;
 
+        case "Manage Employees":
+          manageEmployees();
+          break;
+
         case "Manage Roles":
           manageRoles();
           break;
@@ -70,6 +76,105 @@ function start() {
           console.log("GOODBYE!");
       }
     });
+}
+
+function manageEmployees() {
+  inquirer
+    .prompt({
+      name: "action",
+      type: "list",
+      message: "Select an option below to manage employees",
+      choices: [
+        "Update an employee's role",
+        "Update an employee's manager",
+        "Add an employee",
+        "Delete an employee",
+        "Return to main menu",
+      ],
+    })
+    .then(function (answer) {
+      switch (answer.action) {
+        case "Update an employee's role":
+          updateRole();
+          break;
+
+        case "Update an employee's manager":
+          updateManager();
+          break;
+
+        case "Add an employee":
+          addEmployee();
+          break;
+
+        case "Delete an employee":
+          deleteEmployee();
+          break;
+
+        case "Return to main menu":
+          start();
+          break;
+      }
+    });
+}
+
+function updateRole() {
+  let employee = [];
+  let role = [];
+
+  db.query("SELECT * FROM employees", function (err, res) {
+    if (err) throw err;
+
+    if (res.length === 0) {
+      console.log("-----------------");
+      console.log("No employees found!");
+      console.log("------------------");
+      start();
+      return;
+    }
+
+    employee = res.map((employees) => employees.first_name);
+
+    db.query("SELECT * FROM roles", function (err, res) {
+      if (err) throw err;
+
+      if (res.length === 0) {
+        console.log("-----------------");
+        console.log("No roles found!");
+        console.log("------------------");
+        start();
+        return;
+      }
+
+      role = res.map((roles) => roles.title);
+
+      inquirer
+        .prompt([
+          {
+            name: "employee",
+            type: "list",
+            message: "Which employee would you like to update?",
+            choices: employee,
+          },
+          {
+            name: "role",
+            type: "list",
+            message: "What is the employee's new role?",
+            choices: role,
+          },
+        ])
+        .then(function (answer) {
+          db.query(
+            "UPDATE employees SET role_id = (SELECT id FROM roles WHERE title = ?) WHERE first_name = ?",
+            [answer.role, answer.employee],
+            function (err, res) {
+              if (err) throw err;
+              console.log("Employee updated!");
+              start();
+            }
+          );
+        });
+    });
+  });
 }
 
 function viewDatabase() {
@@ -164,16 +269,10 @@ function addEmployee() {
   db.query("SELECT * FROM roles", function (err, res) {
     if (err) throw err;
 
-    if (res.length === 0) {
-      console.log("-----------------");
-      console.log("No roles found! Please add a role before adding an employee");
-      console.log("------------------");
-      start();
-      return;
-    }
-
-    role = res.map((roles) => roles.title)
+    role = res.map((roles) => roles.title);
     role.push("Add a new role");
+
+    let roleID;
 
     inquirer
       .prompt([
@@ -194,39 +293,62 @@ function addEmployee() {
           choices: role,
         },
       ])
-      .then(function (answer) {
+      .then(async function (answer) {
         if (answer.role === "Add a new role") {
-          inquirer
-            .prompt([
-              {
-                name: "roles",
-                type: "input",
-                message: "What is the name of the new role?",
-              },
-              {
-                name: "salary",
-                type: "input",
-                message: "What is the salary of the role? (Please enter a number)",
-              },
-            ])
-            .then(function (answer) {
-              db.query(
-                "INSERT INTO roles SET ?",
-                {
-                  title: answer.roles,
-                  salary: answer.salary,
-                },
-                function (err) {
-                  if (err) throw err;
-                  console.log("-----------------");
-                  console.log("Role added!");
-                  console.log("-----------------");
-                }
-              );
-            });
-          }
-          roleID = res.find((roles) => roles.title === answer.roles).id;
+          const newRoleAnswers = await inquirer.prompt([
+            {
+              name: "roles",
+              type: "input",
+              message: "What is the name of the new role?",
+            },
+            {
+              name: "salary",
+              type: "input",
+              message:
+                "What is the salary of the role? (Please enter a number)",
+            },
+          ]);
 
+          db.query(
+            "INSERT INTO roles SET ?",
+            {
+              title: newRoleAnswers.roles,
+              salary: newRoleAnswers.salary,
+            },
+            function (err, insertedRole) {
+              if (err) throw err;
+              console.log("-----------------");
+              console.log("Role added!");
+              console.log("-----------------");
+
+              db.query("SELECT * FROM roles WHERE id = ?", insertedRole.insertId, function (err, newRole) {
+                if (err) throw err;
+
+                db.query(
+                  "INSERT INTO employees SET ?",
+                  {
+                    first_name: answer.firstName,
+                    last_name: answer.lastName,
+                    role_id: newRole[0].id,
+                  },
+                  function (err) {
+                    if (err) throw err;
+    
+                    console.log("-----------------");
+                    console.log("Employee added!");
+                    console.log("-----------------");
+                    start();
+                  }
+                );
+              });
+            }
+          );
+        } else {
+          const selectedRole = res.find((roles) => roles.title === answer.role);
+          if (selectedRole) {
+            roleID = selectedRole.id;
+          }
+    
           db.query(
             "INSERT INTO employees SET ?",
             {
@@ -236,23 +358,17 @@ function addEmployee() {
             },
             function (err) {
               if (err) throw err;
-
+    
               console.log("-----------------");
-              console.log("Employee added!");
-              console.log("-----------------");
-              start();
+            console.log("Employee added!");
+            console.log("-----------------");
+            start();
             }
           );
-        });
-    });
+        }
+      });
+  });
 }
-
-
-   
-
-
-
-
 
 
 
@@ -319,7 +435,9 @@ function addRole() {
 
     if (res.length === 0) {
       console.log("-----------------");
-      console.log("No departments found, please add a department before adding a role!");
+      console.log(
+        "No departments found, please add a department before adding a role!"
+      );
       console.log("-----------------");
       start();
       return;
@@ -372,7 +490,7 @@ function addRole() {
               );
             });
         }
-        departmentId = res.find(
+        let departmentId = res.find(
           (department) => department.name === answer.department
         ).id;
 
@@ -394,7 +512,6 @@ function addRole() {
       });
   });
 }
-
 
 // Delete a role
 function deleteRole() {
@@ -553,4 +670,58 @@ function deleteDepartment() {
         );
       });
   });
+}
+
+function updateManager() {
+  db.query(
+    "SELECT id, first_name, last_name FROM employees",
+    (err, employees) => {
+      if (err) throw err;
+      if (employees.length === 0) {
+        console.log("There are no employees to update.");
+        start();
+        return;
+      }
+      inquirer
+        .prompt([
+          {
+            name: "employee",
+            type: "list",
+            message: "Which employee would you like to update?",
+            choices: employees.map(
+              (employee) => employee.first_name + " " + employee.last_name
+            ),
+          },
+          {
+            name: "manager",
+            type: "list",
+            message: "Who is the employee's new manager?",
+            choices: employees.map(
+              (employee) => employee.first_name + " " + employee.last_name
+            ),
+          },
+        ])
+        .then(function (answer) {
+          const employeeToUpdate = employees.find(
+            (employee) =>
+              employee.first_name + " " + employee.last_name === answer.employee
+          );
+          const managerToUpdate = employees.find(
+            (employee) =>
+              employee.first_name + " " + employee.last_name === answer.manager
+          );
+          db.query(
+            "UPDATE employees SET manager_id = ? WHERE id = ?",
+            [managerToUpdate.id, employeeToUpdate.id],
+            (err) => {
+              if (err) throw err;
+              console.log("-----------------");
+              console.log("Employee updated!");
+              console.log("-----------------");
+              start();
+            }
+          );
+        });
+    }
+  );
 }
