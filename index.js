@@ -112,8 +112,15 @@ function viewAllEmployees() {
     "SELECT employees.id AS 'EMPLOYEE ID', employees.first_name AS 'FIRST NAME', employees.last_name AS 'LAST NAME', roles.title AS 'ROLE', departments.name AS 'DEPARTMENT',CONCAT(managers.first_name, ' ', managers.last_name) AS 'MANAGER NAME',roles.salary AS 'SALARY' FROM employees LEFT JOIN roles ON employees.role_id = roles.id LEFT JOIN departments ON roles.dept_id = departments.id LEFT JOIN employees AS managers ON employees.manager_id = managers.id;",
     function (err, res) {
       if (err) throw err;
-      console.table(res);
-      start();
+      if (res.length === 0) {
+        console.log("-----------------");
+        console.log("No employees found!");
+        console.log("------------------");
+        start();
+      } else {
+        console.table(res);
+        start();
+      }
     }
   );
 }
@@ -122,8 +129,15 @@ function viewAllEmployees() {
 function viewAllRoles() {
   db.query("SELECT * FROM ROLES", function (err, res) {
     if (err) throw err;
-    console.table(res);
-    start();
+    if (res.length === 0) {
+      console.log("-----------------");
+      console.log("No roles found!");
+      console.log("------------------");
+      start();
+    } else {
+      console.table(res);
+      start();
+    }
   });
 }
 
@@ -131,87 +145,116 @@ function viewAllRoles() {
 function viewAllDepartments() {
   db.query("SELECT * FROM DEPARTMENTS", function (err, res) {
     if (err) throw err;
-    console.table(res);
-    start();
+    if (res.length === 0) {
+      console.log("----------------------");
+      console.log("No departments found!");
+      console.log("----------------------");
+      start();
+    } else {
+      console.table(res);
+      start();
+    }
   });
 }
 
 // Add an employee
 function addEmployee() {
-  // viewAllEmployees();
-  inquirer
-    .prompt([
-      {
-        name: "firstName",
-        type: "input",
-        message: "What is the employee's first name?",
-      },
-      {
-        name: "lastName",
-        type: "input",
-        message: "What is the employee's last name?",
-      },
-      {
-        name: "role",
-        type: "list",
-        message: "What is the employee's role?",
-        choices: [
-          "Sales Lead",
-          "Salesperson",
-          "Lead Engineer",
-          "Software Engineer",
-          "Account Manager",
-          "Accountant",
-          "Legal Team Lead",
-          "Lawyer",
-        ],
-      },
-    ])
-    .then(function (answer) {
-      let roleId;
-      switch (answer.role) {
-        case "Sales Lead":
-          roleId = 1;
-          break;
-        case "Salesperson":
-          roleId = 2;
-          break;
-        case "Lead Engineer":
-          roleId = 3;
-          break;
-        case "Software Engineer":
-          roleId = 4;
-          break;
-        case "Accountant":
-          roleId = 5;
-          break;
-        case "Legal Team Lead":
-          roleId = 6;
-          break;
-        case "Lawyer":
-          roleId = 7;
-          break;
-        default:
-          roleId = null;
-      }
+  let role = [];
 
-      db.query(
-        "INSERT INTO employees SET ?",
+  db.query("SELECT * FROM roles", function (err, res) {
+    if (err) throw err;
+
+    if (res.length === 0) {
+      console.log("-----------------");
+      console.log("No roles found! Please add a role before adding an employee");
+      console.log("------------------");
+      start();
+      return;
+    }
+
+    role = res.map((roles) => roles.title)
+    role.push("Add a new role");
+
+    inquirer
+      .prompt([
         {
-          first_name: answer.firstName,
-          last_name: answer.lastName,
-          role_id: roleId,
+          name: "firstName",
+          type: "input",
+          message: "What is the employee's first name?",
         },
-        function (err) {
-          if (err) throw err;
-          console.log("-----------------");
-          console.log("Employee added!");
-          console.log("-----------------");
-          start();
-        }
-      );
+        {
+          name: "lastName",
+          type: "input",
+          message: "What is the employee's last name?",
+        },
+        {
+          name: "role",
+          type: "list",
+          message: "What is the employee's role?",
+          choices: role,
+        },
+      ])
+      .then(function (answer) {
+        if (answer.role === "Add a new role") {
+          inquirer
+            .prompt([
+              {
+                name: "roles",
+                type: "input",
+                message: "What is the name of the new role?",
+              },
+              {
+                name: "salary",
+                type: "input",
+                message: "What is the salary of the role? (Please enter a number)",
+              },
+            ])
+            .then(function (answer) {
+              db.query(
+                "INSERT INTO roles SET ?",
+                {
+                  title: answer.roles,
+                  salary: answer.salary,
+                },
+                function (err) {
+                  if (err) throw err;
+                  console.log("-----------------");
+                  console.log("Role added!");
+                  console.log("-----------------");
+                }
+              );
+            });
+          }
+          roleID = res.find((roles) => roles.title === answer.roles).id;
+
+          db.query(
+            "INSERT INTO employees SET ?",
+            {
+              first_name: answer.firstName,
+              last_name: answer.lastName,
+              role_id: roleID,
+            },
+            function (err) {
+              if (err) throw err;
+
+              console.log("-----------------");
+              console.log("Employee added!");
+              console.log("-----------------");
+              start();
+            }
+          );
+        });
     });
 }
+
+
+   
+
+
+
+
+
+
 
 // Delete an employee
 function deleteEmployee() {
@@ -271,90 +314,87 @@ function manageRoles() {
 function addRole() {
   let departments = [];
 
-  // Query existing departments
-  db.query("SELECT name FROM departments", (err, res) => {
+  db.query("SELECT * FROM departments", function (err, res) {
     if (err) throw err;
+
+    if (res.length === 0) {
+      console.log("-----------------");
+      console.log("No departments found, please add a department before adding a role!");
+      console.log("-----------------");
+      start();
+      return;
+    }
 
     departments = res.map((department) => department.name);
     departments.push("Add a new department");
 
-    // Prompt for role information
     inquirer
       .prompt([
         {
-          name: "title",
+          name: "role",
           type: "input",
-          message: "What is the role's title?",
+          message: "What is the name of the role?",
         },
         {
           name: "salary",
           type: "input",
-          message: "What is the role's salary?",
+          message: "What is the salary of the role? (Please enter a number)",
         },
         {
           name: "department",
           type: "list",
-          message: "What department does the role belong to?",
+          message: "What is the role's department?",
           choices: departments,
         },
       ])
-      .then((answer) => {
+      .then(function (answer) {
         if (answer.department === "Add a new department") {
-          // Prompt for new department name
           inquirer
-            .prompt({
-              name: "newDepartment",
-              type: "input",
-              message: "What is the name of the new department?",
-            })
-            .then((departmentAnswer) => {
-              // Insert new department into database
+            .prompt([
+              {
+                name: "newDepartment",
+                type: "input",
+                message: "What is the name of the new department?",
+              },
+            ])
+            .then(function (answer) {
               db.query(
-                "INSERT INTO departments (name) VALUES (?)",
-                [departmentAnswer.newDepartment],
-                (err) => {
+                "INSERT INTO departments SET ?",
+                {
+                  name: answer.newDepartment,
+                },
+                function (err) {
                   if (err) throw err;
-
-                  console.log("New department added successfully.");
-
-                  // Retrieve newly added department's id
-                  db.query(
-                    "SELECT id FROM departments WHERE name = ?",
-                    [departmentAnswer.newDepartment],
-                    (err, res) => {
-                      if (err) throw err;
-
-                      // Insert new role into database with newly added department's id
-                      db.query(
-                        "INSERT INTO roles (title, salary, dept_id) VALUES (?, ?, ?)",
-                        [answer.title, answer.salary, res[0].id],
-                        (err) => {
-                          if (err) throw err;
-
-                          console.log("New role added successfully.");
-                        }
-                      );
-                    }
-                  );
+                  console.log("-----------------");
+                  console.log("Department added!");
+                  console.log("-----------------");
                 }
               );
             });
-        } else {
-          // Insert new role into database
-          db.query(
-            "INSERT INTO roles (title, salary, dept_id) SELECT ?, ?, id FROM departments WHERE name = ?",
-            [answer.title, answer.salary, answer.department],
-            (err) => {
-              if (err) throw err;
-
-              console.log("New role added successfully.");
-              start();
-            }
-          );
         }
+        departmentId = res.find(
+          (department) => department.name === answer.department
+        ).id;
+
+        db.query(
+          "INSERT INTO roles SET ?",
+          {
+            title: answer.role,
+            salary: answer.salary,
+            dept_id: departmentId,
+          },
+          function (err) {
+            if (err) throw err;
+            console.log("-----------------");
+            console.log("Role added!");
+            console.log("-----------------");
+            start();
+          }
+        );
       });
   });
 }
+
 
 // Delete a role
 function deleteRole() {
@@ -469,9 +509,9 @@ function deleteDepartment() {
     if (err) throw err;
 
     if (departments.length === 0) {
-      console.log("------------------------------------")
+      console.log("------------------------------------");
       console.log("There are no departments to delete.");
-      console.log("------------------------------------")
+      console.log("------------------------------------");
       start();
       return;
     }
