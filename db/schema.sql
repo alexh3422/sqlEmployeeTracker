@@ -29,23 +29,23 @@ CREATE TABLE employees (
     KEY (id)
 );
 
-INSERT INTO departments (name)
-VALUES
-    ('Sales'),
-    ('Engineering'),
-    ('Finance'),
-    ('Legal');
+-- INSERT INTO departments (name)
+-- VALUES
+--     ('Sales'),
+--     ('Engineering'),
+--     ('Finance'),
+--     ('Legal');
 
 
-INSERT INTO roles (title, salary, dept_id)
-VALUES
-('Sales Lead', 100000, 1),
-('Salesperson', 80000, 1),
-('Lead Engineer', 120000, 2),
-('Software Engineer', 100000, 2),
-('Accountant', 125000, 3),
-('Legal Team Lead', 130000, 4),
-('Lawyer', 120000, 4);
+-- INSERT INTO roles (title, salary, dept_id)
+-- VALUES
+-- ('Sales Lead', 100000, 1),
+-- ('Salesperson', 80000, 1),
+-- ('Lead Engineer', 120000, 2),
+-- ('Software Engineer', 100000, 2),
+-- ('Accountant', 125000, 3),
+-- ('Legal Team Lead', 130000, 4),
+-- ('Lawyer', 120000, 4);
 
 
 

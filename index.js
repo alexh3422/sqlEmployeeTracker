@@ -2,7 +2,7 @@ const express = require("express");
 // Import and require mysql2
 const mysql = require("mysql");
 const inquirer = require("inquirer");
-// const cTable = require("console.table");
+const consoletable = require("console.table");
 
 const app = express();
 
@@ -38,8 +38,6 @@ function start() {
       message: "What would you like to do?",
       choices: [
         "View Database",
-        "Add an employee",
-        "Delete an employee",
         "Manage Employees",
         "Manage Roles",
         "Manage Departments",
@@ -50,14 +48,6 @@ function start() {
       switch (answer.action) {
         case "View Database":
           viewDatabase();
-          break;
-
-        case "Add an employee":
-          addEmployee();
-          break;
-
-        case "Delete an employee":
-          deleteEmployee();
           break;
 
         case "Manage Employees":
@@ -232,18 +222,21 @@ function viewAllEmployees() {
 
 // View all roles
 function viewAllRoles() {
-  db.query("SELECT * FROM ROLES", function (err, res) {
-    if (err) throw err;
-    if (res.length === 0) {
-      console.log("-----------------");
-      console.log("No roles found!");
-      console.log("------------------");
-      start();
-    } else {
-      console.table(res);
-      start();
+  db.query(
+    "SELECT roles.id AS 'ROLE ID', roles.title AS 'ROLE NAME', roles.salary AS 'SALARY', departments.name AS 'DEPARTMENT NAME' FROM roles JOIN departments ON roles.dept_id = departments.id",
+    function (err, res) {
+      if (err) throw err;
+      if (res.length === 0) {
+        console.log("-----------------");
+        console.log("No roles found!");
+        console.log("------------------");
+        start();
+      } else {
+        console.table(res);
+        start();
+      }
     }
-  });
+  );
 }
 
 // View all departments
@@ -321,26 +314,30 @@ function addEmployee() {
               console.log("Role added!");
               console.log("-----------------");
 
-              db.query("SELECT * FROM roles WHERE id = ?", insertedRole.insertId, function (err, newRole) {
-                if (err) throw err;
+              db.query(
+                "SELECT * FROM roles WHERE id = ?",
+                insertedRole.insertId,
+                function (err, newRole) {
+                  if (err) throw err;
 
-                db.query(
-                  "INSERT INTO employees SET ?",
-                  {
-                    first_name: answer.firstName,
-                    last_name: answer.lastName,
-                    role_id: newRole[0].id,
-                  },
-                  function (err) {
-                    if (err) throw err;
-    
-                    console.log("-----------------");
-                    console.log("Employee added!");
-                    console.log("-----------------");
-                    start();
-                  }
-                );
-              });
+                  db.query(
+                    "INSERT INTO employees SET ?",
+                    {
+                      first_name: answer.firstName,
+                      last_name: answer.lastName,
+                      role_id: newRole[0].id,
+                    },
+                    function (err) {
+                      if (err) throw err;
+
+                      console.log("-----------------");
+                      console.log("Employee added!");
+                      console.log("-----------------");
+                      start();
+                    }
+                  );
+                }
+              );
             }
           );
         } else {
@@ -348,7 +345,7 @@ function addEmployee() {
           if (selectedRole) {
             roleID = selectedRole.id;
           }
-    
+
           db.query(
             "INSERT INTO employees SET ?",
             {
@@ -358,11 +355,11 @@ function addEmployee() {
             },
             function (err) {
               if (err) throw err;
-    
+
               console.log("-----------------");
-            console.log("Employee added!");
-            console.log("-----------------");
-            start();
+              console.log("Employee added!");
+              console.log("-----------------");
+              start();
             }
           );
         }
@@ -370,34 +367,55 @@ function addEmployee() {
   });
 }
 
-
-
 // Delete an employee
 function deleteEmployee() {
-  inquirer
-    .prompt([
-      {
-        name: "employeeDelete",
-        type: "input",
-        message:
-          "What is the ID number of the employee you would like to delete?",
-      },
-    ])
-    .then(function (answer) {
-      db.query(
-        "DELETE FROM employees WHERE ?",
+  let employees = [];
+
+  db.query("SELECT * FROM employees", function (err, res) {
+    if (err) throw err;
+
+    employees = res.map(
+      (employee) => employee.first_name + " " + employee.last_name
+    );
+
+    inquirer
+
+      .prompt([
         {
-          id: answer.employeeDelete,
+          name: "employee",
+          type: "list",
+          message: "Which employee would you like to delete?",
+          choices: employees,
         },
-        function (err) {
-          if (err) throw err;
-          console.log("-----------------");
-          console.log("Employee deleted!");
-          console.log("-----------------");
-          start();
-        }
-      );
-    });
+      ])
+      .then(function (answer) {
+        const selectedEmployee = res.find(
+          (employee) =>
+            employee.first_name + " " + employee.last_name === answer.employee
+        );
+
+        db.query(
+          "UPDATE employees SET manager_id = NULL WHERE manager_id = ?",
+          selectedEmployee.id,
+          function (err) {
+            if (err) throw err;
+          }
+        );
+
+        db.query(
+          "DELETE FROM employees WHERE id = ?",
+          selectedEmployee.id,
+          function (err) {
+            if (err) throw err;
+
+            console.log("-----------------");
+            console.log("Employee deleted!");
+            console.log("-----------------");
+            start();
+          }
+        );
+      });
+  });
 }
 
 // Manage roles
@@ -407,7 +425,12 @@ function manageRoles() {
       name: "action",
       type: "list",
       message: "What would you like to do?",
-      choices: ["Add a role", "Delete a role", "Return to main menu"],
+      choices: [
+        "Add a role",
+        "Delete a role",
+        "Update a role's department",
+        "Return to main menu",
+      ],
     })
     .then(function (answer) {
       switch (answer.action) {
@@ -421,6 +444,10 @@ function manageRoles() {
 
         case "Return to main menu":
           start();
+          break;
+
+        case "Update a role's department":
+          updateRoleDepartment();
           break;
       }
     });
@@ -724,4 +751,59 @@ function updateManager() {
         });
     }
   );
+}
+
+function updateRoleDepartment() {
+  let roles = [];
+  let departments = [];
+
+  db.query("SELECT * FROM roles", function (err, rolesResult) {
+    if (err) throw err;
+
+    roles = rolesResult.map((roles) => roles.title);
+
+    db.query("SELECT * FROM departments", function (err, departmentsResult) {
+      if (err) throw err;
+
+      departments = departmentsResult.map((departments) => departments.name);
+
+      inquirer
+        .prompt([
+          {
+            name: "role",
+            type: "list",
+            message: "Which role's department would you like to change?",
+            choices: roles,
+          },
+          {
+            name: "department",
+            type: "list",
+            message: "Which department would you like to add to the role?",
+            choices: departments,
+          },
+        ])
+        .then(function (answer) {
+          const selectedRole = rolesResult.find(
+            (roles) => roles.title === answer.role
+          );
+
+          const selectedDepartment = departmentsResult.find(
+            (departments) => departments.name === answer.department
+          );
+
+          db.query(
+            "UPDATE roles SET dept_id = ? WHERE id = ?",
+            [selectedDepartment.id, selectedRole.id],
+            function (err) {
+              if (err) throw err;
+
+              console.log("-----------------");
+              console.log("Role updated!");
+              console.log("-----------------");
+              start();
+            }
+          );
+        });
+    });
+  });
 }
