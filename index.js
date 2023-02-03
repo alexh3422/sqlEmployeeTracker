@@ -15,6 +15,7 @@ const db = mysql.createConnection({
   host: "localhost",
   port: 3306,
   user: "root",
+  // UPDATE PASSWORD BELOW TO WHATEVER YOUR MYSQL PASSWORD IS THAT YOU USED DURING INSTALLATION
   password: "password",
   database: "employees_db",
 });
