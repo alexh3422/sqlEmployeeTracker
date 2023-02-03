@@ -107,6 +107,7 @@ function manageEmployees() {
     });
 }
 
+// update employee role 
 function updateRole() {
   let employee = [];
   let role = [];
@@ -167,6 +168,7 @@ function updateRole() {
   });
 }
 
+// view database information
 function viewDatabase() {
   inquirer
     .prompt({
@@ -257,14 +259,18 @@ function viewAllDepartments() {
 
 // Add an employee
 function addEmployee() {
-  let role = [];
 
+  // creates empty array to hold roles from database 
+  let role = [];
+// queries database for roles and pushes them into the role array
   db.query("SELECT * FROM roles", function (err, res) {
     if (err) throw err;
-
+// 
     role = res.map((roles) => roles.title);
-    role.push("Add a new role");
+    
 
+
+    // declares variable to hold role id
     let roleID;
 
     inquirer
@@ -341,8 +347,10 @@ function addEmployee() {
             }
           );
         } else {
+          // finds the role id of the selected role and assigns it to the roleID variable
           const selectedRole = res.find((roles) => roles.title === answer.role);
           if (selectedRole) {
+            // assigns the role id to the roleID variable
             roleID = selectedRole.id;
           }
 
@@ -351,6 +359,7 @@ function addEmployee() {
             {
               first_name: answer.firstName,
               last_name: answer.lastName,
+              // assigns the role id to the role_id column in the employees table
               role_id: roleID,
             },
             function (err) {
@@ -452,6 +461,8 @@ function manageRoles() {
       }
     });
 }
+
+
 
 // Add a role
 function addRole() {
