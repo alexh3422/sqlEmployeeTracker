@@ -28,6 +28,8 @@ To install this app, clone the this repo at https://github.com/alexh3422/sqlEmpl
 
 7. Switch back to your terminal window and once again from the root folder of this repo type `node index.js` , You should now see the app opened up in your terminal window! :) 
 
+A DEMO VIDEO OF INSTALLATION AND USAGE CAN BE FOUND HERE https://drive.google.com/file/d/1yhGgj9aPwHDrzDu0YSaViIDYbayliWtP/view?usp=share_link
+
 ## USAGE INSTRUCTIONS 
 
 to use the app simply use the arrow keys on your keybaord to navigate through your options, and press enter to select the option you would like. 
